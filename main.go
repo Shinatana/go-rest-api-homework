@@ -1,12 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"net/http"
-
 	"github.com/go-chi/chi/v5"
+	"net/http"
 )
 
 type Task struct {
@@ -20,7 +18,7 @@ var tasks = map[string]Task{
 	"1": {
 		ID:          "1",
 		Description: "Сделать финальное задание темы REST API",
-		Note:        "Если сегодня сделаю, то завтра будет свободный день. Ура!",
+		Note:        "Если сегодня сделаю, то завтра будет свободный день. Ура! Но я никогда это не сделаю...",
 		Applications: []string{
 			"VS Code",
 			"Terminal",
@@ -40,7 +38,7 @@ var tasks = map[string]Task{
 	},
 }
 
-func getTask(w http.ResponseWriter, r *http.Request) {
+func getfirstTask(w http.ResponseWriter, r *http.Request) {
 	// сериализуем данные из слайса artists
 	resp, err := json.Marshal(tasks)
 	if err != nil {
@@ -48,36 +46,39 @@ func getTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// в заголовок записываем тип контента, у нас это данные в формате JSON
 	w.Header().Set("Content-Type", "application/json")
-	// так как все успешно, то статус OK
 	w.WriteHeader(http.StatusOK)
-	// записываем сериализованные в JSON данные в тело ответа
 	_, _ = w.Write(resp)
 }
 
 func postTask(w http.ResponseWriter, r *http.Request) {
-	var task Task
-	var buf bytes.Buffer
-
-	_, err := buf.ReadFrom(r.Body)
+	var newTask Task
+	err := r.ParseForm()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if err = json.Unmarshal(buf.Bytes(), &task); err != nil {
+	err = json.NewDecoder(r.Body).Decode(&newTask)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	//Проверяю наличие заголовка content-type
+	if r.Header.Get("Content-Type") == "" {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	tasks[task.ID] = task
+	tasks[newTask.ID] = newTask
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 }
 
-func geTTask(w http.ResponseWriter, r *http.Request) {
+func getsecondTask(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
 	task, ok := tasks[id]
@@ -100,33 +101,28 @@ func geTTask(w http.ResponseWriter, r *http.Request) {
 func deleteTask(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	task, ok := tasks[id]
+	_, ok := tasks[id]
 	if !ok {
-		http.Error(w, "", http.StatusBadRequest)
+		http.Error(w, "task not found", http.StatusBadRequest)
 		return
 	}
 
-	resp, err := json.Marshal(task)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	delete(tasks, id)
 
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(resp)
 }
 
 func main() {
 	r := chi.NewRouter()
+	//r := chi.NewRouter()
 
-	r.Get("/tasks", getTask)
+	r.Get("/tasks", getfirstTask)
 
 	r.Post("/tasks", postTask)
 
-	r.Get("/artist/{id}", geTTask)
+	r.Get("/tasks/{id}", getsecondTask)
 
-	r.Get("/artist/{id}", deleteTask)
+	r.Delete("/tasks/{id}", deleteTask)
 
 	if err := http.ListenAndServe(":8080", r); err != nil {
 		fmt.Printf("Ошибка при запуске сервера: %s", err.Error())
