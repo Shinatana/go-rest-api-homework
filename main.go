@@ -38,7 +38,7 @@ var tasks = map[string]Task{
 	},
 }
 
-func getfirstTask(w http.ResponseWriter, r *http.Request) {
+func getTasks(w http.ResponseWriter, r *http.Request) {
 	// сериализуем данные из слайса artists
 	resp, err := json.Marshal(tasks)
 	if err != nil {
@@ -62,14 +62,14 @@ func postTask(w http.ResponseWriter, r *http.Request) {
 	err = json.NewDecoder(r.Body).Decode(&newTask)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	//Проверяю наличие заголовка content-type
-	if r.Header.Get("Content-Type") == "" {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+	//Првоеряю на наличие такого таска
+	_, ok := tasks[newTask.ID]
+	if ok {
+		http.Error(w, err.Error(), http.StatusConflict)
 	}
 
 	tasks[newTask.ID] = newTask
@@ -78,7 +78,7 @@ func postTask(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
-func getsecondTask(w http.ResponseWriter, r *http.Request) {
+func getTaskById(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
 	task, ok := tasks[id]
@@ -116,11 +116,11 @@ func main() {
 	r := chi.NewRouter()
 	//r := chi.NewRouter()
 
-	r.Get("/tasks", getfirstTask)
+	r.Get("/tasks", getTasks)
 
 	r.Post("/tasks", postTask)
 
-	r.Get("/tasks/{id}", getsecondTask)
+	r.Get("/tasks/{id}", getTaskById)
 
 	r.Delete("/tasks/{id}", deleteTask)
 
